@@ -122,6 +122,76 @@ export class QuizService {
           source_document: "Sampling Design.pdf",
           source_page: 8,
           source_chunk_id: "chunk_00508"
+        },
+        {
+          question: "Under the MoSPI National Data Quality Framework, what is the primary statistical criterion for detecting multivariate outliers in complex survey microdata?",
+          options: {
+            A: "Mahalanobis distance exceeding critical chi-square value at p < 0.001",
+            B: "Simple univariate z-score cutoff of +/- 1.96",
+            C: "Interquartile range (IQR) multiplier of 0.5 without weight adjustment",
+            D: "Elimination of top 5% of records based on household size alone"
+          },
+          correct_answer: "A",
+          explanation: "MoSPI Data Quality Framework specifies Mahalanobis distance with appropriate degrees of freedom as the standard robust metric for multidimensional outlier detection in microdata verification.",
+          source_document: "Data Quality.pdf",
+          source_page: 12,
+          source_chunk_id: "chunk_00312"
+        },
+        {
+          question: "In second-stage stratification (SSS) of households in NSS surveys, what criterion is typically used to classify relatively affluent households into SSS 1?",
+          options: {
+            A: "Household possessing specified luxury consumer durables or high monthly per capita expenditure (MPCE)",
+            B: "Households with more than 10 members irrespective of income",
+            C: "Only households where all members are university graduates",
+            D: "Any household residing in a multi-story concrete building"
+          },
+          correct_answer: "A",
+          explanation: "NSS Survey Design manuals specify that SSS 1 is formed to capture relatively affluent households based on dynamic MPCE cutoffs and high-value asset possession to ensure representation of upper income deciles.",
+          source_document: "Sampling Design.pdf",
+          source_page: 6,
+          source_chunk_id: "chunk_00505"
+        },
+        {
+          question: "How are sample weights (multipliers) adjusted in NSS estimation when an FSU has non-response or casualty households in a specific stratum?",
+          options: {
+            A: "Re-weighting by multiplying the design weight by the inverse of the response rate within the sub-stratum/SSS",
+            B: "Substituting casualty households with the nearest available neighbour",
+            C: "Discarding the entire FSU from national aggregation",
+            D: "Setting the casualty household weight to 1.0 automatically"
+          },
+          correct_answer: "A",
+          explanation: "The official estimation procedure dictates non-response adjustment factors calculated as the ratio of allocated sample units to successfully surveyed units within each explicit design cell.",
+          source_document: "Sampling Design.pdf",
+          source_page: 9,
+          source_chunk_id: "chunk_00509"
+        },
+        {
+          question: "Which of the following is considered a non-sampling error that can be mitigated through rigorous interviewer training and CAPI validation rules?",
+          options: {
+            A: "Measurement and recall bias during household expenditure elicitation",
+            B: "Standard error arising purely from random probability sample selection",
+            C: "Finite population correction factor shrinkage",
+            D: "Sample variance increase due to smaller sample allocation"
+          },
+          correct_answer: "A",
+          explanation: "Survey Methodology guidelines distinguish non-sampling errors (reporting error, recall bias, data entry slips) from sampling variance, noting that CAPI field range checks directly reduce measurement error.",
+          source_document: "Survey Methodology.pdf",
+          source_page: 15,
+          source_chunk_id: "chunk_00215"
+        },
+        {
+          question: "In complex survey analysis, what is the design effect (Deff) defined as?",
+          options: {
+            A: "Ratio of the variance of the estimator under complex multistage design to the variance under simple random sampling (SRS) of the same sample size",
+            B: "Difference between the sample mean and the population parameter",
+            C: "Square root of the total sample size divided by the number of strata",
+            D: "Correlation coefficient between primary stage units across quarters"
+          },
+          correct_answer: "A",
+          explanation: "Design effect (Deff = Var_complex / Var_srs) measures the inflation of sampling variance due to clustering and stratification relative to an unweighted simple random sample.",
+          source_document: "Sampling Design.pdf",
+          source_page: 11,
+          source_chunk_id: "chunk_00511"
         }
       ].slice(0, count);
     }

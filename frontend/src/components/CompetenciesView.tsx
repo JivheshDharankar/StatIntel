@@ -1,6 +1,21 @@
-import React, { useState } from 'react';
-import { Target, Sparkles, CheckCircle2, AlertCircle, Filter } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { 
+  Target, 
+  Search, 
+  Filter, 
+  Sparkles, 
+  Award, 
+  TrendingUp, 
+  CheckCircle2, 
+  AlertCircle,
+  BarChart2,
+  ChevronRight,
+  ShieldCheck
+} from 'lucide-react';
 import { Competency, UserCompetency } from '../types';
+import { StatusBadge, getCategoryBadgeVariant } from './ui/StatusBadge';
+import { StatCard } from './ui/StatCard';
+import { PageHeader } from './ui/PageHeader';
 
 interface CompetenciesViewProps {
   competencies: Competency[];
@@ -13,132 +28,222 @@ export function CompetenciesView({
   userCompetencies,
   onStartQuiz
 }: CompetenciesViewProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const categories = ['All', 'Statistical', 'Technical', 'Digital Governance', 'Behavioural/Managerial'];
+  const categories = [
+    { id: 'all', label: 'All Framework Domains' },
+    { id: 'Statistical', label: 'Statistical' },
+    { id: 'Technical', label: 'Technical' },
+    { id: 'Digital Governance', label: 'Digital Governance' },
+    { id: 'Behavioural/Managerial', label: 'Behavioural' }
+  ];
 
-  const filteredCompetencies = selectedCategory === 'All'
-    ? competencies
-    : competencies.filter(c => c.category === selectedCategory);
+  // Map user competency score dictionary
+  const userCompMap = useMemo(() => {
+    const map = new Map<string, UserCompetency>();
+    userCompetencies.forEach(uc => {
+      map.set(uc.competencyId, uc);
+      if (uc.competency?.code) {
+        map.set(uc.competency.code, uc);
+      }
+    });
+    return map;
+  }, [userCompetencies]);
+
+  const filteredCompetencies = useMemo(() => {
+    return competencies.filter(c => {
+      const matchCat = selectedCategory === 'all' || c.category === selectedCategory;
+      const matchSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          c.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          c.description.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchCat && matchSearch;
+    });
+  }, [competencies, selectedCategory, searchQuery]);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-gov-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center space-x-2">
-            <Target className="w-5 h-5 text-blue-600" />
-            <h2 className="text-lg font-bold text-slate-900">Official Statistical Cadre Competency Matrix</h2>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Standardized MoSPI Framework • 33 Competencies Across 4 Core Operational Domains
-          </p>
+    <div className="space-y-6 animate-fade-in pb-12">
+      {/* Page Header */}
+      <PageHeader
+        title="Official Statistical Competency Framework"
+        subtitle="33 Official MoSPI competencies mapped across Statistical, Technical, Digital Governance, and Behavioural domains."
+        icon={<Target className="w-5 h-5 text-indigo-500" />}
+        badge={<StatusBadge variant="statistical" size="sm">33 Standard Matrix</StatusBadge>}
+      />
+
+      {/* KPI Overview Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          label="Total Competencies"
+          value={competencies.length}
+          subValue="Framework"
+          trend="MoSPI Cadre Standards"
+          icon={<Target className="w-4 h-4" />}
+          variant="indigo"
+        />
+        <StatCard
+          label="Assessed Skills"
+          value={userCompetencies.length}
+          subValue={`/ ${competencies.length}`}
+          trend="Verified in Dossier"
+          trendType="positive"
+          icon={<ShieldCheck className="w-4 h-4" />}
+          variant="blue"
+        />
+        <StatCard
+          label="High Priority Gaps"
+          value={userCompetencies.filter(uc => (uc.benchmarkScore - uc.estimatedScore) >= 30).length}
+          subValue="Action Items"
+          trend="Immediate Assessment Focus"
+          trendType="critical"
+          icon={<AlertCircle className="w-4 h-4" />}
+          variant="rose"
+        />
+        <StatCard
+          label="Benchmark Target"
+          value="80.0"
+          subValue="Average"
+          trend="Senior Officer Standard"
+          trendType="neutral"
+          icon={<Award className="w-4 h-4" />}
+          variant="emerald"
+        />
+      </div>
+
+      {/* Filter & Search Bar */}
+      <div className="glass-panel rounded-2xl p-4 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4">
+        {/* Category Filter Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-500'
+                    : 'bg-slate-100 dark:bg-midnight-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-midnight-750'
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Category Filters */}
-        <div className="flex flex-wrap gap-1.5">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-colors ${
-                selectedCategory === cat
-                  ? 'bg-gov-primary text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+        {/* Live Search Input */}
+        <div className="relative min-w-[240px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name, code or topic..."
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-midnight-850 border border-slate-200 dark:border-midnight-750 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          />
         </div>
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredCompetencies.map(comp => {
-          const userComp = userCompetencies.find(
-            uc => uc.competencyId === comp.id || uc.competency?.code === comp.code
-          );
-          const hasScore = userComp !== undefined;
-          const currentScore = userComp?.estimatedScore || 0;
-          const benchmarkScore = comp.benchmarkScore || 80;
-          const gap = Math.max(0, benchmarkScore - currentScore);
+      {/* Competency Data Matrix Table */}
+      <div className="glass-panel rounded-2xl overflow-hidden">
+        <div className="p-4 border-b border-slate-100 dark:border-midnight-800 flex justify-between items-center bg-slate-50/50 dark:bg-midnight-850/50">
+          <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Showing {filteredCompetencies.length} of {competencies.length} Competencies
+          </h3>
+        </div>
 
-          return (
-            <div 
-              key={comp.id}
-              className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
-                hasScore && gap >= 35
-                  ? 'border-amber-200 bg-amber-50/20'
-                  : hasScore && gap > 0
-                  ? 'border-blue-100 bg-white'
-                  : hasScore && gap === 0
-                  ? 'border-emerald-200 bg-emerald-50/20'
-                  : 'border-slate-200 bg-white'
-              }`}
-            >
-              <div className="space-y-2">
-                <div className="flex justify-between items-start">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                    {comp.code}
-                  </span>
-                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                    comp.category === 'Statistical'
-                      ? 'bg-purple-100 text-purple-800'
-                      : comp.category === 'Technical'
-                      ? 'bg-blue-100 text-blue-800'
-                      : comp.category === 'Digital Governance'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {comp.category}
-                  </span>
-                </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-100/60 dark:bg-midnight-900 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-midnight-800">
+              <tr>
+                <th className="py-3.5 px-4">Code</th>
+                <th className="py-3.5 px-4">Competency Name & Scope</th>
+                <th className="py-3.5 px-4">Domain</th>
+                <th className="py-3.5 px-4">Current / Target</th>
+                <th className="py-3.5 px-4">Readiness Progress</th>
+                <th className="py-3.5 px-4">Gap Status</th>
+                <th className="py-3.5 px-4 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-midnight-800/80 font-medium">
+              {filteredCompetencies.map((comp) => {
+                const userComp = userCompMap.get(comp.id) || userCompMap.get(comp.code);
+                const currentScore = userComp ? userComp.estimatedScore : 35;
+                const benchmark = comp.benchmarkScore || 80;
+                const gap = Math.max(0, benchmark - currentScore);
+                const isCritical = gap >= 30;
+                const isModerate = gap > 0 && gap < 30;
+                const isProficient = gap === 0;
 
-                <h3 className="font-bold text-slate-900 text-sm">{comp.name}</h3>
-                <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                  {comp.description}
-                </p>
+                return (
+                  <tr key={comp.id} className="hover:bg-slate-50/70 dark:hover:bg-midnight-850/60 transition-colors">
+                    <td className="py-4 px-4 font-mono font-bold text-blue-600 dark:text-blue-400">
+                      {comp.code}
+                    </td>
 
-                {/* Score Status */}
-                <div className="pt-2 border-t border-slate-100 space-y-1 text-xs">
-                  <div className="flex justify-between font-medium">
-                    <span className="text-slate-500">
-                      {hasScore ? `Current: ${currentScore}` : 'Not Assessed Yet'}
-                    </span>
-                    <span className="text-slate-700">Target: {benchmarkScore}</span>
-                  </div>
+                    <td className="py-4 px-4 max-w-sm">
+                      <div className="font-extrabold text-slate-900 dark:text-white text-sm">
+                        {comp.name}
+                      </div>
+                      <div className="text-slate-500 dark:text-slate-400 text-[11px] line-clamp-1 mt-0.5">
+                        {comp.description}
+                      </div>
+                    </td>
 
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden flex">
-                    <div 
-                      className={`h-full ${gap >= 35 ? 'bg-amber-500' : 'bg-gov-primary'}`} 
-                      style={{ width: `${currentScore}%` }}
-                    />
-                  </div>
+                    <td className="py-4 px-4">
+                      <StatusBadge variant={getCategoryBadgeVariant(comp.category)} size="sm">
+                        {comp.category}
+                      </StatusBadge>
+                    </td>
 
-                  {hasScore && (
-                    <div className="flex justify-between text-[11px] pt-0.5">
-                      <span className="text-slate-500">Gap Score:</span>
-                      <span className={`font-bold ${gap > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                        {gap > 0 ? `+${gap} pts needed` : 'Benchmark Met'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                    <td className="py-4 px-4 tabular-nums">
+                      <span className="font-extrabold text-slate-900 dark:text-white">{currentScore}</span>
+                      <span className="text-slate-400 dark:text-slate-500"> / {benchmark}</span>
+                    </td>
 
-              <div className="mt-4 pt-3 border-t border-slate-100">
-                <button
-                  onClick={() => onStartQuiz(comp.name)}
-                  className="w-full py-1.5 px-3 bg-slate-100 hover:bg-gov-primary hover:text-white text-slate-700 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center space-x-1"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Launch Assessment</span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
+                    <td className="py-4 px-4 min-w-[140px]">
+                      <div className="space-y-1">
+                        <div className="w-full bg-slate-200 dark:bg-midnight-750 h-2 rounded-full overflow-hidden flex">
+                          <div 
+                            className={`h-full ${
+                              isCritical ? 'bg-rose-500' : isModerate ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}
+                            style={{ width: `${Math.min(100, (currentScore / benchmark) * 100)}%` }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-slate-400 flex justify-between">
+                          <span>{Math.round((currentScore / benchmark) * 100)}% of target</span>
+                          <span className="font-bold">{gap > 0 ? `-${gap} pts` : 'Met'}</span>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="py-4 px-4">
+                      <StatusBadge 
+                        variant={isCritical ? 'critical' : isModerate ? 'moderate' : 'proficient'} 
+                        size="sm"
+                      >
+                        {isCritical ? 'CRITICAL GAP' : isModerate ? 'MODERATE GAP' : 'PROFICIENT'}
+                      </StatusBadge>
+                    </td>
+
+                    <td className="py-4 px-4 text-right">
+                      <button
+                        onClick={() => onStartQuiz(comp.name)}
+                        className="px-3 py-1.5 bg-gov-primary dark:bg-blue-600 hover:bg-gov-secondary text-white font-bold text-xs rounded-lg shadow-sm transition-all inline-flex items-center space-x-1"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Assess</span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

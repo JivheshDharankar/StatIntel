@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Navbar, NavTab } from './components/Navbar';
+import { AppShell } from './components/layout/AppShell';
+import { NavTab } from './components/layout/Sidebar';
 import { DashboardView } from './components/DashboardView';
 import { CompetenciesView } from './components/CompetenciesView';
 import { LearningCatalogueView } from './components/LearningCatalogueView';
@@ -29,6 +30,27 @@ export function App() {
   const [backendHealth, setBackendHealth] = useState<BackendHealthResponse | null>(null);
   const [aiStatus, setAiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   
+  // Dark Mode Theme State
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('statintel_theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('statintel_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('statintel_theme', 'light');
+    }
+  }, [isDarkMode]);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode(prev => !prev);
+  };
+
   // Data States
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
@@ -90,14 +112,18 @@ export function App() {
     loadAllData();
   }, []);
 
-  const handleStartQuiz = async (topic: string) => {
+  const handleStartQuiz = async (
+    topic: string = 'Sampling',
+    questionCount: number = 5,
+    difficulty: string = 'medium'
+  ) => {
     setActiveTab('assessment');
     setQuizLoading(true);
     setError(null);
     setQuizResult(null);
     setUserAnswers({});
     try {
-      const quiz = await generateQuiz(topic, 3, 'medium');
+      const quiz = await generateQuiz(topic, questionCount, difficulty);
       setActiveQuiz(quiz);
     } catch (err: any) {
       setError(err.message || 'Failed to generate assessment quiz');
@@ -143,91 +169,78 @@ export function App() {
     setUserAnswers({});
   };
 
+  const criticalGapsCount = skillGaps.filter(g => g.status === 'critical_gap').length;
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-      {/* Top Navbar with branding & tabs */}
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        profile={profile}
-        backendHealth={backendHealth}
-        aiStatus={aiStatus}
-        loading={loading}
-        onRefresh={loadAllData}
-      />
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Error Alert */}
-        {error && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-xl flex items-center space-x-3 text-xs">
-            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-            <div>
-              <span className="font-bold">Notice:</span> {error}
-            </div>
+    <AppShell
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
+      profile={profile}
+      backendHealth={backendHealth}
+      aiStatus={aiStatus}
+      criticalGapsCount={criticalGapsCount}
+      learningCount={learningResources.length}
+      loading={loading}
+      onRefresh={loadAllData}
+      isDarkMode={isDarkMode}
+      onToggleTheme={toggleDarkMode}
+    >
+      {/* Error Alert */}
+      {error && (
+        <div className="bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 p-4 rounded-2xl flex items-center space-x-3 text-xs animate-fade-in shadow-sm">
+          <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0" />
+          <div>
+            <span className="font-bold">System Notice:</span> {error}
           </div>
-        )}
-
-        {/* Tab Views */}
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            profile={profile}
-            skillGaps={skillGaps}
-            recommendations={recommendations}
-            onStartQuiz={handleStartQuiz}
-          />
-        )}
-
-        {activeTab === 'competencies' && (
-          <CompetenciesView
-            competencies={competencies}
-            userCompetencies={userCompetencies}
-            onStartQuiz={handleStartQuiz}
-          />
-        )}
-
-        {activeTab === 'learning' && (
-          <LearningCatalogueView
-            resources={learningResources}
-            onStartQuiz={handleStartQuiz}
-          />
-        )}
-
-        {activeTab === 'assessment' && (
-          <AssessmentView
-            activeQuiz={activeQuiz}
-            quizLoading={quizLoading}
-            submittingQuiz={submittingQuiz}
-            quizResult={quizResult}
-            userAnswers={userAnswers}
-            onStartQuiz={handleStartQuiz}
-            onSelectOption={handleSelectOption}
-            onSubmitQuiz={handleSubmitQuiz}
-            onResetQuiz={handleResetQuiz}
-          />
-        )}
-
-        {activeTab === 'evidence' && (
-          <EvidenceView
-            skillGaps={skillGaps}
-            onStartQuiz={handleStartQuiz}
-          />
-        )}
-      </main>
-
-      {/* Government Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 text-xs text-slate-500 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
-          <div className="flex items-center space-x-2">
-            <span className="font-bold text-slate-700">StatIntel</span>
-            <span>• Smart India Hackathon (SIH26101) Functional Prototype</span>
-          </div>
-          <span className="text-slate-400">
-            Ministry of Statistics & Programme Implementation • Official Statistical System
-          </span>
         </div>
-      </footer>
-    </div>
+      )}
+
+      {/* Tab Views */}
+      {activeTab === 'dashboard' && (
+        <DashboardView
+          profile={profile}
+          skillGaps={skillGaps}
+          recommendations={recommendations}
+          onStartQuiz={(topic) => handleStartQuiz(topic, 5, 'medium')}
+        />
+      )}
+
+      {activeTab === 'competencies' && (
+        <CompetenciesView
+          competencies={competencies}
+          userCompetencies={userCompetencies}
+          onStartQuiz={(topic) => handleStartQuiz(topic, 5, 'medium')}
+        />
+      )}
+
+      {activeTab === 'learning' && (
+        <LearningCatalogueView
+          resources={learningResources}
+          onStartQuiz={(topic) => handleStartQuiz(topic, 5, 'medium')}
+        />
+      )}
+
+      {activeTab === 'assessment' && (
+        <AssessmentView
+          activeQuiz={activeQuiz}
+          quizLoading={quizLoading}
+          submittingQuiz={submittingQuiz}
+          quizResult={quizResult}
+          userAnswers={userAnswers}
+          onStartQuiz={handleStartQuiz}
+          onSelectOption={handleSelectOption}
+          onSubmitQuiz={handleSubmitQuiz}
+          onResetQuiz={handleResetQuiz}
+        />
+      )}
+
+      {activeTab === 'evidence' && (
+        <EvidenceView
+          skillGaps={skillGaps}
+          onStartQuiz={(topic) => handleStartQuiz(topic, 5, 'medium')}
+        />
+      )}
+    </AppShell>
   );
 }
 

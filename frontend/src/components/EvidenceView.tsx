@@ -1,6 +1,22 @@
 import React from 'react';
-import { Award, Target, TrendingUp, CheckCircle2, FileText, Sparkles } from 'lucide-react';
+import { 
+  Award, 
+  Target, 
+  TrendingUp, 
+  CheckCircle2, 
+  FileText, 
+  Sparkles, 
+  ShieldCheck, 
+  BrainCircuit, 
+  Zap, 
+  LineChart, 
+  Layers,
+  ArrowRight
+} from 'lucide-react';
 import { SkillGapItem } from '../services/api';
+import { StatusBadge, getCategoryBadgeVariant } from './ui/StatusBadge';
+import { StatCard } from './ui/StatCard';
+import { PageHeader } from './ui/PageHeader';
 
 interface EvidenceViewProps {
   skillGaps: SkillGapItem[];
@@ -11,100 +27,215 @@ export function EvidenceView({
   skillGaps,
   onStartQuiz
 }: EvidenceViewProps) {
+  const criticalCount = skillGaps.filter(g => g.status === 'critical_gap').length;
+  const moderateCount = skillGaps.filter(g => g.status === 'moderate_gap').length;
+  const proficientCount = skillGaps.filter(g => g.status === 'proficient' || g.status === 'mastery').length;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-gov-sm space-y-2">
-        <div className="flex items-center space-x-2">
-          <Award className="w-5 h-5 text-emerald-600" />
-          <h2 className="text-lg font-bold text-slate-900">Competency Evidence & Gap Closure Progression</h2>
-        </div>
-        <p className="text-xs text-slate-500 leading-relaxed max-w-3xl">
-          StatIntel implements a conservative Bayesian evidence update model. Quiz performances serve as competency evidence signals that update baseline ratings without unrealistic jumps.
-        </p>
+    <div className="space-y-8 animate-fade-in pb-12">
+      {/* Page Header */}
+      <PageHeader
+        title="Evidence Ledger & Gap Closure Progression"
+        subtitle="Bayesian evidence update pipeline tracking official statistical cadre capability through grounded AI assessments."
+        icon={<Award className="w-5 h-5 text-emerald-500" />}
+        badge={<StatusBadge variant="proficient" size="sm">{skillGaps.length} Tracked Skills</StatusBadge>}
+      />
+
+      {/* KPI Overview Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          label="Tracked Competencies"
+          value={skillGaps.length}
+          subValue="Active"
+          trend="Continuous Assessment"
+          icon={<ShieldCheck className="w-4 h-4" />}
+          variant="indigo"
+        />
+        <StatCard
+          label="Critical Gaps"
+          value={criticalCount}
+          subValue="Action Flags"
+          trend="Requires Evaluation"
+          trendType="critical"
+          icon={<Target className="w-4 h-4" />}
+          variant="rose"
+        />
+        <StatCard
+          label="Moderate Gaps"
+          value={moderateCount}
+          subValue="In Progress"
+          trend="Partial Mastery"
+          trendType="negative"
+          icon={<Zap className="w-4 h-4" />}
+          variant="amber"
+        />
+        <StatCard
+          label="Proficient Areas"
+          value={proficientCount}
+          subValue="Verified"
+          trend="Benchmark Satisfied"
+          trendType="positive"
+          icon={<CheckCircle2 className="w-4 h-4" />}
+          variant="emerald"
+        />
       </div>
 
-      {/* Model Specification Card */}
-      <div className="bg-gradient-to-br from-blue-50/60 to-white rounded-xl p-5 border border-blue-200 shadow-sm space-y-3">
-        <h3 className="font-bold text-slate-900 text-sm flex items-center space-x-2">
-          <Sparkles className="w-4 h-4 text-blue-600" />
-          <span>Evidence Scoring Methodology</span>
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-          <div className="p-3 bg-white rounded-lg border border-slate-200">
-            <span className="font-bold text-slate-800 block mb-1">1. Bayesian Update Formula</span>
-            <code className="text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded block">
-              new = prev × 0.75 + quiz × 0.25
-            </code>
+      {/* Bayesian Methodology & Data Flow Architecture (2 Columns) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Bayesian Update Mathematical Model */}
+        <div className="glass-panel rounded-2xl p-6 space-y-4">
+          <div className="flex items-center space-x-2 border-b border-slate-100 dark:border-midnight-800 pb-3">
+            <BrainCircuit className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              Bayesian Evidence Calibration Model
+            </h3>
           </div>
-          <div className="p-3 bg-white rounded-lg border border-slate-200">
-            <span className="font-bold text-slate-800 block mb-1">2. Remaining Gap Formula</span>
-            <code className="text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded block">
-              new_gap = max(0, target - new)
-            </code>
+
+          <div className="space-y-3">
+            <div className="p-3.5 bg-slate-50 dark:bg-midnight-850 rounded-xl border border-slate-200/80 dark:border-midnight-750 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                Step 1: Dynamic Evidence Weight
+              </span>
+              <code className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 block">
+                Weight = max(0.1, min(0.4, (Quiz Score / 100) * 0.5))
+              </code>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 dark:bg-midnight-850 rounded-xl border border-slate-200/80 dark:border-midnight-750 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                Step 2: Score Recalculation
+              </span>
+              <code className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 block">
+                New Score = Old Score * (1 - Weight) + (Quiz Score * Weight)
+              </code>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 dark:bg-midnight-850 rounded-xl border border-slate-200/80 dark:border-midnight-750 space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block">
+                Step 3: Remaining Gap & Closure
+              </span>
+              <code className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400 block">
+                New Gap = max(0, Benchmark Target - New Score)
+              </code>
+            </div>
           </div>
-          <div className="p-3 bg-white rounded-lg border border-slate-200">
-            <span className="font-bold text-slate-800 block mb-1">3. Gap Closed Percentage</span>
-            <code className="text-[11px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded block">
-              ((old_gap - new_gap) / old_gap) × 100
-            </code>
+
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 italic pt-1">
+            Note: StatIntel enforces a conservative evidence update model. Single assessment anomalies are dampened by the weight factor, requiring repeated demonstrated capability.
+          </p>
+        </div>
+
+        {/* Right: Data Flow Architecture */}
+        <div className="glass-panel rounded-2xl p-6 space-y-4">
+          <div className="flex items-center space-x-2 border-b border-slate-100 dark:border-midnight-800 pb-3">
+            <Zap className="w-5 h-5 text-amber-500" />
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
+              End-to-End Pipeline Architecture
+            </h3>
+          </div>
+
+          <div className="relative pl-6 border-l-2 border-slate-200 dark:border-midnight-750 space-y-4 text-xs">
+            {[
+              {
+                title: "1. FAISS Semantic Context Search",
+                desc: "363 indexed MoSPI chunks retrieved based on selected competency domain.",
+                color: "bg-blue-500"
+              },
+              {
+                title: "2. Gemini 3.6 Flash Structured MCQ Formulation",
+                desc: "Strictly grounded MCQs synthesized with Pydantic schema validation.",
+                color: "bg-cyan-500"
+              },
+              {
+                title: "3. Officer Assessment & Submission",
+                desc: "5, 7, or 10 question evaluation submitted with impact weighting.",
+                color: "bg-indigo-500"
+              },
+              {
+                title: "4. Bayesian Evidence Ledger Mutation",
+                desc: "Updated competency score recorded; gap closure recalculated live.",
+                color: "bg-emerald-500"
+              }
+            ].map((step, idx) => (
+              <div key={idx} className="relative">
+                <div className={`absolute -left-[31px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white dark:border-midnight-950 ${step.color} shadow-sm`} />
+                <h4 className="font-extrabold text-slate-900 dark:text-white">{step.title}</h4>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{step.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Competency Gap Status Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-gov-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center">
-          <h3 className="font-bold text-slate-800 text-sm">Official Competency Status & Progress</h3>
-          <span className="text-xs text-slate-500 font-medium">{skillGaps.length} Tracked Skills</span>
+      {/* Live Competency Audit Ledger Table */}
+      <div className="glass-panel rounded-2xl overflow-hidden">
+        <div className="p-4 border-b border-slate-100 dark:border-midnight-800 flex justify-between items-center bg-slate-50/50 dark:bg-midnight-850/50">
+          <div className="flex items-center space-x-2">
+            <LineChart className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <h3 className="font-bold text-xs uppercase tracking-wider text-slate-900 dark:text-white">
+              Live Competency & Evidence State Ledger
+            </h3>
+          </div>
+          <span className="text-xs text-rose-600 dark:text-rose-400 font-bold">
+            {criticalCount} Critical Action Flags
+          </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-100/75 text-slate-600 font-semibold border-b border-slate-200 uppercase text-[10px] tracking-wider">
+            <thead className="bg-slate-100/60 dark:bg-midnight-900 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-midnight-800">
               <tr>
-                <th className="py-3 px-4">Priority</th>
-                <th className="py-3 px-4">Competency</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Current Score</th>
-                <th className="py-3 px-4">Target</th>
-                <th className="py-3 px-4">Remaining Gap</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4 text-right">Action</th>
+                <th className="py-3.5 px-4">Priority</th>
+                <th className="py-3.5 px-4">Competency Name</th>
+                <th className="py-3.5 px-4">Category</th>
+                <th className="py-3.5 px-4">Current Score</th>
+                <th className="py-3.5 px-4">Target Benchmark</th>
+                <th className="py-3.5 px-4">Remaining Gap</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4 text-right">Evidence Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {skillGaps.map(gap => (
-                <tr key={gap.competencyId} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-bold text-slate-900">#{gap.priorityRank}</td>
-                  <td className="py-3 px-4 font-bold text-slate-900">{gap.competencyName}</td>
-                  <td className="py-3 px-4 text-slate-500">{gap.category}</td>
-                  <td className="py-3 px-4">
-                    <span className="font-bold text-slate-900">{gap.currentScore}</span> / 100
+            <tbody className="divide-y divide-slate-100 dark:divide-midnight-800/80 font-medium">
+              {skillGaps.map((gap) => (
+                <tr key={gap.competencyId} className="hover:bg-slate-50/70 dark:hover:bg-midnight-850/60 transition-colors">
+                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
+                    #{gap.priorityRank}
                   </td>
-                  <td className="py-3 px-4">{gap.requiredScore}</td>
-                  <td className="py-3 px-4">
-                    <span className={`font-bold ${gap.gap > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-                      {gap.gap > 0 ? `+${gap.gap} pts` : '0 pts (Met)'}
+                  <td className="py-3.5 px-4 font-extrabold text-slate-900 dark:text-white">
+                    {gap.competencyName}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <StatusBadge variant={getCategoryBadgeVariant(gap.category)} size="sm">
+                      {gap.category}
+                    </StatusBadge>
+                  </td>
+                  <td className="py-3.5 px-4 tabular-nums">
+                    <span className="font-extrabold text-slate-900 dark:text-white">{gap.currentScore}</span>
+                    <span className="text-slate-400 dark:text-slate-500"> / 100</span>
+                  </td>
+                  <td className="py-3.5 px-4 tabular-nums font-semibold text-slate-700 dark:text-slate-300">
+                    {gap.requiredScore}
+                  </td>
+                  <td className="py-3.5 px-4 tabular-nums">
+                    <span className={`font-extrabold ${gap.gap > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600'}`}>
+                      {gap.gap > 0 ? `-${gap.gap} pts` : '0 (Target Met)'}
                     </span>
                   </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      gap.status === 'critical_gap' 
-                        ? 'bg-amber-100 text-amber-800' 
-                        : gap.status === 'moderate_gap'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-emerald-100 text-emerald-800'
-                    }`}>
+                  <td className="py-3.5 px-4">
+                    <StatusBadge
+                      variant={gap.status === 'critical_gap' ? 'critical' : gap.status === 'moderate_gap' ? 'moderate' : 'proficient'}
+                      size="sm"
+                    >
                       {gap.status.replace('_', ' ').toUpperCase()}
-                    </span>
+                    </StatusBadge>
                   </td>
-                  <td className="py-3 px-4 text-right">
+                  <td className="py-3.5 px-4 text-right">
                     <button
                       onClick={() => onStartQuiz(gap.competencyName)}
-                      className="px-2.5 py-1 bg-gov-primary hover:bg-gov-secondary text-white text-[11px] font-semibold rounded shadow-sm transition-colors"
+                      className="px-3 py-1.5 bg-gov-primary dark:bg-blue-600 hover:bg-gov-secondary text-white font-bold text-xs rounded-lg shadow-sm transition-all inline-flex items-center space-x-1"
                     >
-                      Assess
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Update Evidence</span>
                     </button>
                   </td>
                 </tr>

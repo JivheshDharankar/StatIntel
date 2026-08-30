@@ -3,29 +3,86 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-primary: #f8fafc;
+    --bg-surface: #ffffff;
+    --bg-surface-elevated: #f1f5f9;
+    --border-subtle: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+  }
+
+  .dark {
+    --bg-primary: #050811;
+    --bg-surface: #080E1A;
+    --bg-surface-elevated: #0C1425;
+    --border-subtle: #162442;
+    --border-strong: #1E3056;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
+  }
+
   body {
-    @apply bg-slate-50 text-slate-800 antialiased font-sans;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    @apply antialiased font-sans transition-colors duration-200;
   }
 }
 
-/* Custom scrollbars */
+/* Custom technical grid background */
+.bg-tech-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(226, 232, 240, 0.4) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(226, 232, 240, 0.4) 1px, transparent 1px);
+}
+
+.dark .bg-tech-grid {
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(22, 36, 66, 0.4) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(22, 36, 66, 0.4) 1px, transparent 1px);
+}
+
+/* Glass panel */
+.glass-panel {
+  @apply bg-white/90 dark:bg-midnight-900/80 backdrop-blur-xl border border-slate-200/80 dark:border-midnight-750/80 shadow-panel transition-all;
+}
+
+.glass-panel-elevated {
+  @apply bg-white dark:bg-midnight-850/90 backdrop-blur-xl border border-slate-200 dark:border-midnight-700/80 shadow-panel-lg transition-all;
+}
+
+.glass-card-interactive {
+  @apply glass-panel hover:border-blue-400 dark:hover:border-blue-500/60 hover:shadow-glow-blue cursor-pointer transition-all duration-200;
+}
+
+/* Government header saffron-white-green stripe */
+.gov-top-band {
+  background: linear-gradient(90deg, #FF9933 0%, #FFFFFF 50%, #138808 100%);
+  height: 3px;
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  @apply bg-slate-300 dark:bg-midnight-700 rounded-full;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  @apply bg-slate-400 dark:bg-midnight-600;
 }
 
-/* Government header subtle saffron-white-green stripe */
-.gov-top-band {
-  background: linear-gradient(90deg, #FF9933 0%, #FFFFFF 50%, #138808 100%);
-  height: 3px;
+/* Number display tabular font */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }

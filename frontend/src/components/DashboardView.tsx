@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   Sparkles, 
   Target, 
@@ -10,10 +10,34 @@ import {
   FileText,
   Building2,
   Award,
-  Layers
+  Layers,
+  BarChart3,
+  Radar as RadarIcon,
+  ChevronRight,
+  ShieldCheck,
+  Zap,
+  Check
 } from 'lucide-react';
+import { 
+  ResponsiveContainer, 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  Tooltip as RechartsTooltip, 
+  CartesianGrid, 
+  Legend, 
+  RadarChart, 
+  PolarGrid, 
+  PolarAngleAxis, 
+  PolarRadiusAxis, 
+  Radar 
+} from 'recharts';
 import { UserProfile, Recommendation } from '../types';
 import { SkillGapItem } from '../services/api';
+import { StatCard } from './ui/StatCard';
+import { StatusBadge, getProviderBadgeVariant } from './ui/StatusBadge';
+import { PageHeader } from './ui/PageHeader';
 
 interface DashboardViewProps {
   profile: UserProfile | null;
@@ -28,244 +52,400 @@ export function DashboardView({
   recommendations,
   onStartQuiz
 }: DashboardViewProps) {
-  const criticalGaps = skillGaps.filter(g => g.status === 'critical_gap');
-  const moderateGaps = skillGaps.filter(g => g.status === 'moderate_gap');
+  const criticalGaps = useMemo(() => skillGaps.filter(g => g.status === 'critical_gap'), [skillGaps]);
+  const moderateGaps = useMemo(() => skillGaps.filter(g => g.status === 'moderate_gap'), [skillGaps]);
+  const proficientAreas = useMemo(() => skillGaps.filter(g => g.status === 'proficient' || g.status === 'mastery'), [skillGaps]);
   const topGap = skillGaps[0];
 
+  const averageScore = useMemo(() => {
+    if (skillGaps.length === 0) return 0;
+    const sum = skillGaps.reduce((acc, curr) => acc + curr.currentScore, 0);
+    return Math.round((sum / skillGaps.length) * 10) / 10;
+  }, [skillGaps]);
+
+  const averageGap = useMemo(() => {
+    if (skillGaps.length === 0) return 0;
+    const sum = skillGaps.reduce((acc, curr) => acc + curr.gap, 0);
+    return Math.round((sum / skillGaps.length) * 10) / 10;
+  }, [skillGaps]);
+
+  // Data for Horizontal Competency Gap Bar Chart
+  const gapChartData = useMemo(() => {
+    return skillGaps.slice(0, 6).map(g => ({
+      name: g.competencyName.length > 18 ? `${g.competencyName.substring(0, 16)}...` : g.competencyName,
+      fullName: g.competencyName,
+      Current: g.currentScore,
+      Target: g.requiredScore,
+      Gap: g.gap,
+      category: g.category
+    }));
+  }, [skillGaps]);
+
+  // Data for Radar Domain Mastery Chart
+  const domainRadarData = useMemo(() => {
+    const categories: Record<string, { currentTotal: number; targetTotal: number; count: number }> = {};
+    skillGaps.forEach(g => {
+      const cat = g.category || 'General';
+      if (!categories[cat]) {
+        categories[cat] = { currentTotal: 0, targetTotal: 0, count: 0 };
+      }
+      categories[cat].currentTotal += g.currentScore;
+      categories[cat].targetTotal += g.requiredScore;
+      categories[cat].count += 1;
+    });
+
+    return Object.keys(categories).map(cat => ({
+      domain: cat.replace('/Managerial', '').replace(' Governance', ''),
+      Current: Math.round(categories[cat].currentTotal / categories[cat].count),
+      Benchmark: Math.round(categories[cat].targetTotal / categories[cat].count),
+    }));
+  }, [skillGaps]);
+
   return (
-    <div className="space-y-6">
-      {/* Executive Hero Banner */}
-      <div className="bg-gradient-to-r from-gov-primary via-slate-900 to-gov-secondary rounded-2xl p-6 sm:p-8 text-white shadow-gov-lg relative overflow-hidden">
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-white/10 text-xs font-semibold backdrop-blur-sm mb-3 border border-white/10">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>AI-Enabled Skill Intelligence & Personalized Learning Platform (SIH26101)</span>
+    <div className="space-y-8 animate-fade-in pb-12">
+      {/* 1. Executive Officer Dossier Hero Banner */}
+      <div className="relative rounded-3xl overflow-hidden glass-panel-elevated border border-slate-200/80 dark:border-midnight-700/80 p-6 sm:p-8">
+        {/* Ambient radial lighting */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-br from-blue-600/10 via-indigo-600/10 to-transparent rounded-full blur-3xl pointer-events-none -mr-20 -mt-20" />
+        <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-midnight-800 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700/60 text-xs font-bold shadow-sm">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+              <span>Official Statistical Cadre Intelligence • MoSPI SIH26101</span>
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight font-display">
+              Good morning, {profile?.fullName ? profile.fullName.split(' ')[0] : 'Officer'}
+            </h1>
+
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              Your personalized competency dossier tracks <strong>{skillGaps.length} statistical competencies</strong> mapped to official Ministry standards. Bayesian evidence models continually calibrate your readiness based on verified RAG assessments.
+            </p>
+
+            <div className="flex flex-wrap items-center gap-2 pt-2 text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-semibold text-slate-800 dark:text-slate-200">{profile?.designation || 'Statistical Officer'}</span>
+              <span>•</span>
+              <span>{profile?.department || 'Field Operations Division (FOD)'}</span>
+              <span>•</span>
+              <span>{profile?.experienceYears || 6} Years Cadre Experience</span>
+            </div>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2">
-            Official Statistical Cadre Intelligence Dashboard
-          </h1>
-
-          <p className="text-slate-200 text-xs sm:text-sm leading-relaxed mb-4">
-            Demonstrating end-to-end Competency Assessment → Skill Gap Discovery → iGOT/NSSTA/TPAC Recommendations → RAG Grounded Assessment → Evidence-Based Gap Closure for India's Official Statistical System.
-          </p>
-
-          {/* Primary CTA */}
+          {/* Primary Quick Action */}
           {topGap && (
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            <div className="w-full lg:w-auto bg-slate-50 dark:bg-midnight-850 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-midnight-700 shadow-sm flex flex-col justify-between space-y-3 lg:min-w-[280px]">
+              <div className="flex justify-between items-start">
+                <div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                    #1 Priority Cadre Action
+                  </span>
+                  <div className="text-sm font-extrabold text-slate-900 dark:text-white">
+                    {topGap.competencyName}
+                  </div>
+                </div>
+                <StatusBadge variant="critical" size="sm">
+                  -{topGap.gap} pts
+                </StatusBadge>
+              </div>
+
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                Target benchmark: <strong>{topGap.requiredScore} pts</strong> (Current: {topGap.currentScore})
+              </p>
+
               <button
                 onClick={() => onStartQuiz(topGap.competencyName)}
-                className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-gov-md transition-all flex items-center space-x-2 transform hover:-translate-y-0.5"
+                className="w-full py-2.5 px-4 bg-gradient-to-r from-gov-primary via-blue-700 to-gov-secondary hover:from-blue-900 hover:to-blue-800 text-white font-extrabold text-xs rounded-xl shadow-glow-blue transition-all flex items-center justify-center space-x-2 transform active:scale-[0.99]"
               >
-                <Sparkles className="w-4 h-4 text-slate-950" />
-                <span>Start Skill Assessment: {topGap.competencyName}</span>
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Launch Assessment ({topGap.competencyName})</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-
-              <span className="text-xs text-slate-300">
-                Primary Gap: <strong>{topGap.gap} pts</strong> needed to reach target benchmark ({topGap.requiredScore})
-              </span>
             </div>
           )}
         </div>
       </div>
 
-      {/* Profile Overview Card */}
-      {profile && (
-        <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-gov-sm">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-start space-x-4">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 text-gov-primary flex items-center justify-center font-bold text-lg flex-shrink-0">
-                SO
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <h2 className="text-base font-bold text-slate-900">{profile.fullName}</h2>
-                  <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200 rounded-md">
-                    Demo Profile
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 font-medium">
-                  {profile.designation} • {profile.department}
-                </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Current Assignment: <strong>{profile.currentAssignment}</strong> • Experience: {profile.experienceYears} Years
-                </p>
-              </div>
-            </div>
+      {/* 2. Executive KPI Stat Cards Grid (5 Cards) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <StatCard
+          label="Overall Competency"
+          value={`${averageScore}`}
+          subValue="/ 100"
+          trend="Bayesian Weighted"
+          trendType="positive"
+          icon={<TrendingUp className="w-4 h-4" />}
+          variant="indigo"
+        />
+        <StatCard
+          label="Critical Skill Gaps"
+          value={criticalGaps.length}
+          subValue="Priorities"
+          trend="Immediate Action Required"
+          trendType="critical"
+          icon={<AlertCircle className="w-4 h-4" />}
+          variant="rose"
+        />
+        <StatCard
+          label="Moderate Gaps"
+          value={moderateGaps.length}
+          subValue="Skills"
+          trend="In Training Alignment"
+          trendType="negative"
+          icon={<Target className="w-4 h-4" />}
+          variant="amber"
+        />
+        <StatCard
+          label="Proficient Areas"
+          value={proficientAreas.length}
+          subValue="Verified"
+          trend="Meeting Cadre Benchmark"
+          trendType="positive"
+          icon={<ShieldCheck className="w-4 h-4" />}
+          variant="emerald"
+        />
+        <StatCard
+          label="Learning Resources"
+          value={recommendations.length}
+          subValue="Modules"
+          trend="iGOT / NSSTA / TPAC"
+          trendType="neutral"
+          icon={<BookOpen className="w-4 h-4" />}
+          variant="blue"
+        />
+      </div>
 
-            <div className="flex items-center space-x-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
-              <div className="text-center px-2">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold">Assessed Skills</span>
-                <span className="text-sm font-bold text-slate-900">{skillGaps.length}</span>
-              </div>
-              <div className="h-6 w-px bg-slate-200" />
-              <div className="text-center px-2">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold text-amber-700">Critical Gaps</span>
-                <span className="text-sm font-bold text-amber-700">{criticalGaps.length}</span>
-              </div>
-              <div className="h-6 w-px bg-slate-200" />
-              <div className="text-center px-2">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold text-blue-700">Moderate Gaps</span>
-                <span className="text-sm font-bold text-blue-700">{moderateGaps.length}</span>
-              </div>
+      {/* 3. Recharts Analytics Intelligence Matrix */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left: Competency Readiness vs Benchmark Bar Chart */}
+        <div className="glass-panel rounded-2xl p-6 space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-100 dark:border-midnight-800 pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span>Competency Readiness vs Benchmark Target</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Current score vs official MoSPI benchmark across high-priority gaps
+              </p>
             </div>
+            <StatusBadge variant="statistical" size="sm">Top 6 Gaps</StatusBadge>
+          </div>
+
+          <div className="h-[280px] w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={gapChartData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148, 163, 184, 0.15)" />
+                <XAxis 
+                  dataKey="name" 
+                  tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 600 }} 
+                  axisLine={{ stroke: 'rgba(148, 163, 184, 0.2)' }}
+                  tickLine={false}
+                  angle={-20}
+                  textAnchor="end"
+                />
+                <YAxis 
+                  domain={[0, 100]}
+                  tick={{ fill: 'currentColor', fontSize: 10 }} 
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <RechartsTooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(8, 14, 26, 0.95)', 
+                    borderColor: 'rgba(30, 48, 86, 0.8)', 
+                    borderRadius: '12px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.4)'
+                  }}
+                  itemStyle={{ padding: '2px 0' }}
+                />
+                <Legend verticalAlign="top" align="right" wrapperStyle={{ fontSize: '11px', paddingBottom: '8px' }} />
+                <Bar dataKey="Current" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={28} />
+                <Bar dataKey="Target" fill="#10B981" radius={[4, 4, 0, 0]} maxBarSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
-      )}
 
-      {/* Top 3 Prioritized Skill Gaps */}
-      <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-gov-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
-          <div>
-            <div className="flex items-center space-x-2">
-              <Target className="w-5 h-5 text-blue-600" />
-              <h2 className="font-bold text-slate-900 text-base">Top Prioritized Competency Gaps</h2>
+        {/* Right: Domain Mastery Radar Heatmap */}
+        <div className="glass-panel rounded-2xl p-6 space-y-4">
+          <div className="flex justify-between items-center border-b border-slate-100 dark:border-midnight-800 pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                <RadarIcon className="w-4 h-4 text-indigo-500" />
+                <span>Domain Mastery Radar Profile</span>
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Aggregate cadre capability distributed across 4 core competency pillars
+              </p>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Ranked descending by gap magnitude: <code>gap = max(0, requiredScore - currentScore)</code>
-            </p>
+            <StatusBadge variant="mastery" size="sm">4 Pillars</StatusBadge>
           </div>
-          <span className="text-xs text-blue-800 bg-blue-50 px-3 py-1 rounded-full font-semibold border border-blue-200 self-start sm:self-auto">
-            {criticalGaps.length} Critical Priority Action Items
-          </span>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {skillGaps.slice(0, 3).map(gap => (
-            <div 
-              key={gap.competencyId}
-              className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
-                gap.status === 'critical_gap'
-                  ? 'border-amber-200 bg-gradient-to-br from-amber-50/50 to-white shadow-sm'
-                  : 'border-blue-100 bg-slate-50/50'
-              }`}
-            >
-              <div>
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <span className="text-[10px] font-bold tracking-wider uppercase text-slate-500">
-                      {gap.category}
-                    </span>
-                    <h3 className="font-bold text-slate-900 text-sm">{gap.competencyName}</h3>
-                  </div>
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-amber-100 text-amber-800 border border-amber-200">
-                    Rank #{gap.priorityRank}
-                  </span>
-                </div>
-
-                {/* Progress Bar */}
-                <div className="space-y-1 mt-3">
-                  <div className="flex justify-between text-xs font-medium text-slate-600">
-                    <span>Current: <strong className="text-slate-900">{gap.currentScore}</strong></span>
-                    <span>Target: <strong className="text-slate-900">{gap.requiredScore}</strong></span>
-                  </div>
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden flex">
-                    <div 
-                      className={`h-full ${gap.status === 'critical_gap' ? 'bg-amber-500' : 'bg-blue-500'}`} 
-                      style={{ width: `${gap.currentScore}%` }}
-                    />
-                    <div 
-                      className="h-full bg-slate-300 opacity-60" 
-                      style={{ width: `${gap.gap}%` }}
-                      title={`Gap: ${gap.gap} points`}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center pt-1 text-[11px]">
-                    <span className="text-slate-500">Gap Score:</span>
-                    <span className="font-bold text-slate-800">+{gap.gap} pts needed</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-slate-100">
-                <button
-                  onClick={() => onStartQuiz(gap.competencyName)}
-                  className="w-full py-1.5 px-3 bg-gov-primary hover:bg-gov-secondary text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center justify-center space-x-1"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Start Grounded Assessment</span>
-                </button>
-              </div>
-            </div>
-          ))}
+          <div className="h-[280px] w-full flex items-center justify-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={domainRadarData} outerRadius="75%">
+                <PolarGrid stroke="rgba(148, 163, 184, 0.2)" />
+                <PolarAngleAxis 
+                  dataKey="domain" 
+                  tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 700 }} 
+                />
+                <PolarRadiusAxis domain={[0, 100]} stroke="rgba(148, 163, 184, 0.2)" />
+                <Radar name="Current Score" dataKey="Current" stroke="#6366F1" fill="#6366F1" fillOpacity={0.45} />
+                <Radar name="Benchmark" dataKey="Benchmark" stroke="#10B981" fill="#10B981" fillOpacity={0.15} />
+                <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                <RechartsTooltip 
+                  contentStyle={{ 
+                    backgroundColor: 'rgba(8, 14, 26, 0.95)', 
+                    borderColor: 'rgba(30, 48, 86, 0.8)', 
+                    borderRadius: '12px',
+                    color: '#fff',
+                    fontSize: '12px'
+                  }}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
-      {/* Explainable Recommendations Card */}
-      <div className="bg-white rounded-xl p-6 border border-slate-200 shadow-gov-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-3 gap-2">
+      {/* 4. Prioritized Skill Gap Action Ledger */}
+      <div className="glass-panel rounded-2xl p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-midnight-800 pb-3 gap-2">
           <div>
-            <div className="flex items-center space-x-2">
-              <BookOpen className="w-5 h-5 text-emerald-600" />
-              <h2 className="font-bold text-slate-900 text-base">
-                Personalized Learning Recommendations (API-Ready Adapters)
-              </h2>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Matched deterministically across <strong>iGOT Karmayogi</strong>, <strong>NSSTA</strong>, <strong>TPAC</strong>, and <strong>MoSPI Handbooks</strong>.
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <Target className="w-4 h-4 text-rose-500" />
+              <span>Prioritized Cadre Skill Gap Matrix</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Ranked descending by distance to benchmark target standard
             </p>
           </div>
-          <span className="text-xs text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full font-semibold border border-emerald-200 self-start sm:self-auto">
-            {recommendations.length} Prioritized Resources
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+            {skillGaps.length} Total Competencies Monitored
           </span>
         </div>
 
-        <div className="space-y-3">
-          {recommendations.slice(0, 3).map(rec => (
-            <div 
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-50 dark:bg-midnight-850 text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-midnight-800">
+              <tr>
+                <th className="py-3 px-4">Priority</th>
+                <th className="py-3 px-4">Competency Name</th>
+                <th className="py-3 px-4">Category</th>
+                <th className="py-3 px-4">Score / Target</th>
+                <th className="py-3 px-4">Gap Magnitude</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Cadre Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-midnight-800 font-medium">
+              {skillGaps.slice(0, 5).map((gap) => (
+                <tr key={gap.competencyId} className="hover:bg-slate-50/60 dark:hover:bg-midnight-850/60 transition-colors">
+                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white">
+                    #{gap.priorityRank}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <div className="font-bold text-slate-900 dark:text-white">{gap.competencyName}</div>
+                    <div className="text-[10px] font-mono text-slate-400">{gap.competencyCode}</div>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <StatusBadge variant="statistical" size="sm">{gap.category}</StatusBadge>
+                  </td>
+                  <td className="py-3.5 px-4 tabular-nums">
+                    <span className="font-bold text-slate-900 dark:text-white">{gap.currentScore}</span>
+                    <span className="text-slate-400 dark:text-slate-500"> / {gap.requiredScore}</span>
+                  </td>
+                  <td className="py-3.5 px-4 tabular-nums">
+                    <span className={`font-bold ${gap.gap > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600'}`}>
+                      {gap.gap > 0 ? `-${gap.gap} pts` : 'Target Met'}
+                    </span>
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <StatusBadge 
+                      variant={gap.status === 'critical_gap' ? 'critical' : gap.status === 'moderate_gap' ? 'moderate' : 'proficient'} 
+                      size="sm"
+                    >
+                      {gap.status.replace('_', ' ').toUpperCase()}
+                    </StatusBadge>
+                  </td>
+                  <td className="py-3.5 px-4 text-right">
+                    <button
+                      onClick={() => onStartQuiz(gap.competencyName)}
+                      className="px-3 py-1.5 bg-gov-primary dark:bg-blue-600 hover:bg-gov-secondary text-white font-bold text-[11px] rounded-lg shadow-sm transition-all inline-flex items-center space-x-1"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-300" />
+                      <span>Assess</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 5. Explainable Personalized Learning Pathway */}
+      <div className="glass-panel rounded-2xl p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 dark:border-midnight-800 pb-3 gap-2">
+          <div>
+            <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-emerald-500" />
+              <span>Personalized Learning Interventions (iGOT / NSSTA / TPAC / MoSPI)</span>
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Curriculum mappings targeted directly at closing your largest identified competency deficits
+            </p>
+          </div>
+          <StatusBadge variant="igot" size="sm">
+            {recommendations.length} Modules Recommended
+          </StatusBadge>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {recommendations.slice(0, 3).map((rec) => (
+            <div
               key={rec.id}
-              className="p-4 rounded-xl border border-slate-200 hover:border-blue-300 bg-white transition-all shadow-sm hover:shadow-md flex flex-col sm:flex-row justify-between gap-4"
+              className="glass-panel-elevated p-5 rounded-2xl border border-slate-200/80 dark:border-midnight-750 flex flex-col justify-between space-y-4 hover:border-blue-400 dark:hover:border-blue-500 transition-all group"
             >
-              <div className="space-y-1.5 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                    rec.resource?.source === 'NSSTA' 
-                      ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                      : rec.resource?.source === 'iGOT'
-                      ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                      : rec.resource?.source === 'TPAC'
-                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                      : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                  }`}>
+              <div className="space-y-2.5">
+                <div className="flex justify-between items-start gap-2">
+                  <StatusBadge variant={getProviderBadgeVariant(rec.resource?.source || 'iGOT')} size="sm">
                     {rec.resource?.source}
-                  </span>
-                  <span className="text-xs text-slate-500 font-medium">
-                    {rec.resource?.resourceType} • {rec.resource?.durationHours} hrs • {rec.resource?.targetLevel} • {rec.resource?.deliveryMode}
-                  </span>
-                  <span className="ml-auto sm:ml-0 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                    Match: {rec.matchScore}/100
+                  </StatusBadge>
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                    {rec.matchScore}% Match
                   </span>
                 </div>
 
-                <h3 className="font-bold text-slate-900 text-sm">
+                <h4 className="font-extrabold text-sm text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-snug">
                   {rec.resource?.title}
-                </h3>
-                
-                <p className="text-xs text-slate-600 leading-relaxed">
+                </h4>
+
+                <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 leading-relaxed">
                   {rec.resource?.description}
                 </p>
 
-                {/* Explainable Rationale Box */}
-                <div className="bg-slate-50 border-l-2 border-blue-500 p-2.5 rounded-r text-[11px] text-slate-700">
-                  <strong>Why Recommended:</strong> {rec.rationale}
-                </div>
-
-                <div className="text-[10px] text-slate-400 font-mono">
-                  Provenance: {rec.resource?.sourceDocument} {rec.resource?.sourcePage ? `(Page ${rec.resource.sourcePage})` : ''}
+                {/* Explainable Rationale */}
+                <div className="bg-slate-50 dark:bg-midnight-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-midnight-800 text-[11px] text-slate-600 dark:text-slate-300">
+                  <span className="font-bold text-blue-600 dark:text-blue-400">Why Assigned:</span> {rec.rationale}
                 </div>
               </div>
 
-              <div className="flex sm:flex-col justify-end items-end gap-2 flex-shrink-0">
-                <span className="text-xs font-semibold text-slate-400">
-                  Rank #{rec.priorityRank}
+              <div className="pt-3 border-t border-slate-100 dark:border-midnight-800/80 flex items-center justify-between">
+                <span className="text-[11px] font-mono text-slate-400">
+                  {rec.resource?.durationHours} hrs • {rec.resource?.deliveryMode}
                 </span>
+
                 <button
                   onClick={() => onStartQuiz(rec.resource?.competencyName || 'Sampling')}
-                  className="px-3 py-1.5 bg-gov-primary hover:bg-gov-secondary text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center space-x-1"
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-midnight-800 hover:bg-blue-600 hover:text-white text-slate-700 dark:text-slate-200 font-bold text-xs rounded-lg transition-colors flex items-center space-x-1"
                 >
-                  <span>Assess Module</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span>Verify Skill</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

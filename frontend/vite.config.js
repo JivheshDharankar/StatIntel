@@ -8,11 +8,11 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_BASE_URL || 'http://localhost:5000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
       '/ai': {
-        target: process.env.VITE_AI_SERVICE_URL || 'http://localhost:8000',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ai/, ''),
       },

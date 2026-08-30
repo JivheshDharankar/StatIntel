@@ -192,7 +192,7 @@ export async function fetchLearningResources(category?: string): Promise<Learnin
 
 export async function generateQuiz(
   topic: string = 'Sampling',
-  questionCount: number = 3,
+  questionCount: number = 5,
   difficulty: string = 'medium'
 ): Promise<GeneratedQuizResponse> {
   const res = await fetch(`${API_BASE_URL}/quizzes/generate`, {
