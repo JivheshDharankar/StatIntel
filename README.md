@@ -20,7 +20,7 @@ StatIntel is a functional, end-to-end prototype designed to diagnose competency 
 ### Technical Stack
 - **Frontend (`frontend/`)**: React 18, Vite, TypeScript, Tailwind CSS, Recharts, Lucide Icons, Supabase Auth.
 - **Backend API (`backend/`)**: Node.js, Express, TypeScript, API-ready Source Adapters (`iGOT`, `NSSTA`, `TPAC`), Supabase PostgreSQL client.
-- **AI & RAG Service (`ai-service/`)**: FastAPI, Python 3.10+, PyMuPDF, Sentence-Transformers, FAISS Vector Index, Google Gemini API.
+- **AI & RAG Service (`ai-service/`)**: FastAPI, Python 3.10+, FastEmbed (ONNX Runtime CPU - low RAM, zero PyTorch overhead), FAISS Vector Index, Google Gemini API.
 - **Database & Persistence (`supabase/`)**: PostgreSQL schema (15 normalized tables) covering profiles, competencies, evidence, quizzes, and learning progress.
 
 ---
@@ -102,10 +102,25 @@ Or run each service individually in dedicated terminal tabs:
 
 ---
 
-## 📊 Database Schema Setup
-Execute the migration and seed scripts in Supabase SQL Editor or via CLI:
-1. `supabase/migrations/20260830000001_initial_schema.sql` (Creates 15 core tables & indexes)
-2. `supabase/seed.sql` (Seeds 33 official competencies & demo Statistical Officer profile)
+## 🌐 Render Native Python Deployment (AI Service)
+
+Deploy the `ai-service` on Render's native Python environment (512 MB Free / Starter Tier):
+
+- **Service Type**: Web Service
+- **Environment**: `Python 3`
+- **Root Directory**: `ai-service`
+- **Build Command**:
+  ```bash
+  pip install -r requirements.txt && python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2').embed(['warmup']))"
+  ```
+- **Start Command**:
+  ```bash
+  uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+  ```
+- **Environment Variables**:
+  - `GEMINI_API_KEY`: *(Your Google Gemini API Key)*
+  - `GEMINI_MODEL`: `gemini-2.5-flash` (or `gemini-1.5-flash` / `gemini-3.6-flash`)
+  - `EMBEDDING_MODEL_NAME`: `sentence-transformers/all-MiniLM-L6-v2`
 
 ---
 

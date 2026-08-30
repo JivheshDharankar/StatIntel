@@ -38,12 +38,13 @@ graph TD
 - **Data Source Integrity**: Read-only consumption of processed catalogues; zero fake government APIs.
 
 ### 2.3 AI & Grounded RAG Service (`ai-service/`)
-- **Technology**: FastAPI, PyMuPDF (fitz), Sentence-Transformers (`all-MiniLM-L6-v2`), FAISS Vector Index, Google Gemini API.
+- **Technology**: FastAPI, FastEmbed (ONNX Runtime CPU with `sentence-transformers/all-MiniLM-L6-v2`), FAISS Vector Index, Google Gemini API.
+- **Low-Memory Architecture**: Replaces PyTorch runtime with ONNX Runtime CPU, reducing RAM usage to ~100–140 MB and making it natively deployable on Render's 512 MB tier.
 - **Pipeline**:
   1. PDF Ingestion with page preservation.
   2. Overlapping semantic chunking.
-  3. Normalized embedding generation and cosine-similarity FAISS indexing.
-  4. Top-K context retrieval with strict source document and page citation metadata.
+  3. Fast normalized ONNX embedding generation and cosine-similarity FAISS indexing (363 chunks, dim=384).
+  4. Top-K context retrieval with strict source document, page, and chunk citation metadata.
   5. Strict hallucination-guarded MCQ generation via Gemini.
 
 ### 2.4 Transparent Evidence & Scoring Model

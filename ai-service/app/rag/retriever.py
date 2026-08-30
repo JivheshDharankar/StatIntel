@@ -16,7 +16,9 @@ class RAGRetriever:
             settings.FAISS_INDEX_DIR,
             Path("data/processed/faiss_index"),
             Path("../data/processed/faiss_index"),
-            Path(__file__).resolve().parent.parent.parent.parent / "data" / "processed" / "faiss_index"
+            Path(__file__).resolve().parent.parent.parent / "data" / "processed" / "faiss_index",
+            Path(__file__).resolve().parent.parent.parent.parent / "data" / "processed" / "faiss_index",
+            Path("/app/data/processed/faiss_index")
         ]
         for p in candidates:
             if p.exists() and (p / "chunks.json").exists():
