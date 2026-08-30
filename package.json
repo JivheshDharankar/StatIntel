@@ -1,0 +1,25 @@
+{
+  "name": "statintel-platform",
+  "version": "0.1.0",
+  "description": "AI-enabled Skill Intelligence and Personalized Learning Platform for India's Official Statistical System (SIH26101)",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\" \"npm run dev:ai\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:ai": "cd ai-service && .venv/bin/uvicorn app.main:app --reload --port 8000",
+    "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
+    "lint": "npm run lint --workspace=frontend && npm run lint --workspace=backend",
+    "ingest:source": "ai-service/.venv/bin/python scripts/ingest_source_pdfs.py",
+    "seed:db": "cd backend && npm run seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "author": "StatIntel Team",
+  "license": "MIT"
+}
