@@ -25,6 +25,7 @@ import {
   Target
 } from 'lucide-react';
 import { GeneratedQuizResponse, QuizSubmissionResponse } from '../services/api';
+import { QuickRevisionSection } from './assessment/QuickRevisionSection';
 
 interface AssessmentViewProps {
   activeQuiz: GeneratedQuizResponse | null;
@@ -906,6 +907,14 @@ export function AssessmentView({
             </div>
           </div>
         </div>
+
+        {/* Quick Revision Notes & Targeted Concept Remediation */}
+        <QuickRevisionSection
+          revisionNotes={quizResult.revisionNotes}
+          incorrectQuestions={quizResult.questionResults.filter(qr => !qr.isCorrect)}
+          topic={quizResult.topic}
+          onStartQuizTopic={onStartQuiz}
+        />
 
         {/* Question-by-Question Review with Filter Tabs */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">

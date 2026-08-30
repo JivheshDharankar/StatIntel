@@ -132,15 +132,71 @@ export class QuizController {
         data: result
       });
     } catch (err: any) {
-      if (err.message.includes('not found')) {
-        return res.status(404).json({
-          success: false,
-          error: err.message
-        });
-      }
       return res.status(500).json({
         success: false,
         error: 'Quiz submission error',
+        message: err.message
+      });
+    }
+  }
+
+  /**
+   * Generates grounded quick revision notes for mistaken questions
+   */
+  static async generateRevisionNotes(req: Request, res: Response) {
+    try {
+      const { incorrectQuestions = [], topic = 'Sampling' } = req.body;
+      const { RevisionService } = await import('../services/revision.service');
+      const notes = await RevisionService.generateRevisionNotes(incorrectQuestions, topic);
+      return res.json({
+        success: true,
+        topic,
+        count: notes.length,
+        notes
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate revision notes',
+        message: err.message
+      });
+    }
+  }
+
+  /**
+   * Generates a novel scenario retry question targeting a specific weak concept
+   * while strictly avoiding duplication of original assessment questions.
+   */
+  static async generateRetryQuestion(req: Request, res: Response) {
+    try {
+      const { topic = 'Sampling', concept, excludeQuestions = [], difficulty = 'medium' } = req.body;
+      const question = await QuizService.generateRetryQuestion({
+        topic,
+        concept,
+        excludeQuestions,
+        difficulty
+      });
+
+      return res.json({
+        success: true,
+        topic,
+        concept: concept || topic,
+        question: {
+          id: question.id,
+          questionNumber: 1,
+          question: question.question,
+          options: question.options,
+          correctAnswer: question.correctAnswer,
+          explanation: question.explanation,
+          sourceDocument: question.sourceDocument,
+          sourcePage: question.sourcePage,
+          sourceChunkId: question.sourceChunkId
+        }
+      });
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate retry question',
         message: err.message
       });
     }

@@ -20,6 +20,9 @@ class QuizGenerateRequest(BaseModel):
     num_questions: Optional[int] = Field(None, ge=1, le=10, description="Alternative alias for question count")
     difficulty: Optional[str] = Field("medium", description="Target difficulty level (easy, medium, hard)")
     target_level: Optional[str] = Field(None, description="Alternative alias for difficulty")
+    concept_focus: Optional[str] = Field(None, description="Specific targeted sub-concept for retry practice")
+    exclude_questions: Optional[List[str]] = Field(default_factory=list, description="Original questions to exclude from reproduction")
+    is_retry: Optional[bool] = Field(False, description="Flag indicating retry practice question")
 
 class QuizSubmissionRequest(BaseModel):
     user_answers: List[Any]
@@ -93,7 +96,10 @@ def generate_grounded_quiz(payload: QuizGenerateRequest):
             topic=topic_name,
             retrieved_chunks=chunks,
             num_questions=count,
-            difficulty=diff
+            difficulty=diff,
+            concept_focus=payload.concept_focus,
+            exclude_questions=payload.exclude_questions,
+            is_retry=bool(payload.is_retry or payload.exclude_questions)
         )
     except ValueError as val_err:
         raise HTTPException(

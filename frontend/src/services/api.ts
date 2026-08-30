@@ -3,7 +3,8 @@ import {
   Competency, 
   UserCompetency, 
   LearningResource, 
-  Recommendation 
+  Recommendation,
+  QuickRevisionNote 
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
@@ -57,6 +58,8 @@ export interface QuizQuestionData {
     C: string;
     D: string;
   };
+  correctAnswer?: string;
+  explanation?: string;
   sourceDocument: string;
   sourcePage: number;
   sourceChunkId: string;
@@ -119,6 +122,7 @@ export interface QuizSubmissionResponse {
     submittedAt: string;
     questionResults: QuestionResultItem[];
     nextRecommendations: Recommendation[];
+    revisionNotes?: QuickRevisionNote[];
   };
 }
 
@@ -230,4 +234,67 @@ export async function submitQuizAnswers(
     throw new Error(err.message || err.error || 'Quiz submission failed');
   }
   return await res.json();
+}
+
+export async function fetchRevisionNotes(
+  incorrectQuestions: QuestionResultItem[],
+  topic: string = 'Sampling'
+): Promise<QuickRevisionNote[]> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/quizzes/revision-notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        incorrectQuestions,
+        topic
+      })
+    });
+    if (!res.ok) throw new Error('Failed to fetch revision notes');
+    const json = await res.json();
+    return json.notes || [];
+  } catch (err) {
+    console.warn('[StatIntel] Revision notes network fallback:', err);
+    return [];
+  }
+}
+
+export async function fetchRetryQuestion(params: {
+  topic?: string;
+  concept?: string;
+  excludeQuestions?: string[];
+  difficulty?: string;
+}): Promise<QuizQuestionData | null> {
+  const { topic = 'Sampling', concept, excludeQuestions = [], difficulty = 'medium' } = params;
+  try {
+    const res = await fetch(`${API_BASE_URL}/quizzes/retry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic,
+        concept,
+        excludeQuestions,
+        difficulty
+      })
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.question) {
+        return json.question;
+      }
+    }
+  } catch (err) {
+    console.warn('[StatIntel] Retry endpoint network fallback:', err);
+  }
+
+  // Fallback to standard generate endpoint if retry route is unreachable
+  try {
+    const res = await generateQuiz(concept || topic, 1, difficulty);
+    if (res && res.questions && res.questions.length > 0) {
+      return res.questions[0];
+    }
+    return null;
+  } catch (err) {
+    console.warn('[StatIntel] Retry question generation fallback:', err);
+    return null;
+  }
 }

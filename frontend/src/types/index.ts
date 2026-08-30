@@ -131,3 +131,18 @@ export interface CompetencyEvidence {
   newScore: number;
   createdAt: string;
 }
+
+export interface QuickRevisionNote {
+  id: string;
+  concept: string;
+  quickNote: string;
+  remember: string;
+  source: {
+    documentTitle: string;
+    page: number | string;
+    chunkId: string;
+  };
+  relatedQuestionIds?: string[];
+  competencyCode?: string;
+  competencyName?: string;
+}

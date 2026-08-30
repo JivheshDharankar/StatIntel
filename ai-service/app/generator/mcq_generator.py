@@ -54,10 +54,14 @@ class GroundedMCQGenerator:
         topic: str,
         retrieved_chunks: List[Dict[str, Any]],
         num_questions: int = 5,
-        difficulty: str = "medium"
+        difficulty: str = "medium",
+        concept_focus: Optional[str] = None,
+        exclude_questions: Optional[List[str]] = None,
+        is_retry: bool = False
     ) -> List[Dict[str, Any]]:
         """
         Generates and strictly validates grounded MCQs using retrieved context and Gemini.
+        Supports concept targeting and exclusion of original questions for retry practice.
         """
         if not retrieved_chunks:
             raise ValueError("No source chunks provided for grounding.")
@@ -65,6 +69,8 @@ class GroundedMCQGenerator:
         client = self._get_gemini_client()
         if not client:
             raise ValueError("GEMINI_API_KEY is not configured or invalid.")
+
+        exclude_list = [q.strip() for q in (exclude_questions or []) if q.strip()]
 
         # Prepare formatted grounding context
         context_blocks = []
@@ -83,9 +89,23 @@ class GroundedMCQGenerator:
 
         context_text = "\n\n".join(context_blocks)
 
-        system_prompt = f"""You are the Official Statistical Cadre Assessment AI for India's Ministry of Statistics and Programme Implementation (MoSPI).
-Your task is to generate {num_questions} high-quality, professional multiple-choice questions (MCQs) for the competency/topic '{topic}' targeting '{difficulty}' difficulty.
+        target_subject = concept_focus or topic
 
+        exclusion_instructions = ""
+        if exclude_list or is_retry:
+            excl_formatted = "\n".join([f"- \"{ex}\"" for ex in exclude_list])
+            exclusion_instructions = f"""
+RETRY & DUPLICATE EXCLUSION INSTRUCTIONS:
+This is a RETRY practice question targeting the concept: '{target_subject}'.
+Generate a BRAND NEW question testing the same underlying concept.
+DO NOT reproduce, paraphrase, or reuse any of the following previous/original questions or their answer options:
+{excl_formatted}
+Use a DIFFERENT practical scenario, different context, and different phrasing to test the same learning objective.
+"""
+
+        system_prompt = f"""You are the Official Statistical Cadre Assessment AI for India's Ministry of Statistics and Programme Implementation (MoSPI).
+Your task is to generate {num_questions} high-quality, professional multiple-choice questions (MCQs) for the competency/topic '{target_subject}' targeting '{difficulty}' difficulty.
+{exclusion_instructions}
 STRICT GROUNDING CONSTRAINTS:
 1. Every question, option, and explanation MUST be strictly derived ONLY from the provided source excerpts below.
 2. DO NOT use outside general knowledge.
@@ -119,58 +139,103 @@ REQUIRED JSON SCHEMA:
 
 Generate {num_questions} strictly grounded MCQs in JSON format matching the schema."""
 
-        try:
-            response = client.models.generate_content(
-                model=self.model_name,
-                contents=f"{system_prompt}\n\n{user_prompt}"
-            )
-            raw_text = response.text or ""
-        except Exception as e:
-            raise RuntimeError(f"Gemini API generation call failed: {str(e)}")
+        # Multi-attempt generation loop (up to 3 attempts) to ensure novelty and duplicate rejection
+        max_attempts = 3
+        last_error = None
 
-        # Parse & clean JSON
-        cleaned = raw_text.strip()
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].startswith("```"):
-                lines = lines[:-1]
-            cleaned = "\n".join(lines).strip()
-
-        try:
-            raw_data = json.loads(cleaned)
-        except Exception as e:
-            # Attempt regex extraction if extra text surrounds JSON array
-            match = re.search(r'\[\s*\{.*\}\s*\]', cleaned, re.DOTALL)
-            if match:
-                try:
-                    raw_data = json.loads(match.group(0))
-                except Exception:
-                    raise ValueError(f"Failed to parse Gemini output as JSON: {raw_text[:200]}")
-            else:
-                raise ValueError(f"Gemini returned non-JSON output: {raw_text[:200]}")
-
-        if not isinstance(raw_data, list):
-            if isinstance(raw_data, dict) and "questions" in raw_data and isinstance(raw_data["questions"], list):
-                raw_data = raw_data["questions"]
-            else:
-                raw_data = [raw_data]
-
-        # Validate and sanitize each MCQ strictly
-        validated_mcqs: List[Dict[str, Any]] = []
-        for idx, item in enumerate(raw_data):
+        for attempt in range(max_attempts):
             try:
-                normalized_item = self._normalize_mcq_item(item, retrieved_chunks)
-                mcq_obj = GroundedMCQ(**normalized_item)
-                validated_mcqs.append(mcq_obj.model_dump())
-            except Exception as val_err:
-                print(f"[GroundedMCQGenerator] Question #{idx+1} failed validation: {val_err}. Skipping.")
+                response = client.models.generate_content(
+                    model=self.model_name,
+                    contents=f"{system_prompt}\n\n{user_prompt}"
+                )
+                raw_text = response.text or ""
+            except Exception as e:
+                last_error = RuntimeError(f"Gemini API generation call failed: {str(e)}")
+                continue
 
-        if not validated_mcqs:
-            raise ValueError("All generated questions failed strict schema or grounding validation.")
+            # Parse & clean JSON
+            cleaned = raw_text.strip()
+            if cleaned.startswith("```"):
+                lines = cleaned.split("\n")
+                if lines[0].startswith("```"):
+                    lines = lines[1:]
+                if lines and lines[-1].startswith("```"):
+                    lines = lines[:-1]
+                cleaned = "\n".join(lines).strip()
 
-        return validated_mcqs[:num_questions]
+            try:
+                raw_data = json.loads(cleaned)
+            except Exception:
+                match = re.search(r'\[\s*\{.*\}\s*\]', cleaned, re.DOTALL)
+                if match:
+                    try:
+                        raw_data = json.loads(match.group(0))
+                    except Exception:
+                        last_error = ValueError(f"Failed to parse Gemini output as JSON: {raw_text[:200]}")
+                        continue
+                else:
+                    last_error = ValueError(f"Gemini returned non-JSON output: {raw_text[:200]}")
+                    continue
+
+            if not isinstance(raw_data, list):
+                if isinstance(raw_data, dict) and "questions" in raw_data and isinstance(raw_data["questions"], list):
+                    raw_data = raw_data["questions"]
+                else:
+                    raw_data = [raw_data]
+
+            # Validate schema and reject duplicates against excluded original questions
+            validated_mcqs: List[Dict[str, Any]] = []
+            for idx, item in enumerate(raw_data):
+                try:
+                    normalized_item = self._normalize_mcq_item(item, retrieved_chunks)
+                    mcq_obj = GroundedMCQ(**normalized_item)
+                    mcq_dict = mcq_obj.model_dump()
+
+                    # Duplicate check against excluded original questions
+                    if self._is_too_similar(mcq_dict.get("question", ""), exclude_list):
+                        print(f"[GroundedMCQGenerator] Attempt {attempt+1}: Question rejected as too similar to original: {mcq_dict.get('question')[:60]}...")
+                        continue
+
+                    validated_mcqs.append(mcq_dict)
+                except Exception as val_err:
+                    print(f"[GroundedMCQGenerator] Question #{idx+1} failed validation: {val_err}. Skipping.")
+
+            if validated_mcqs:
+                return validated_mcqs[:num_questions]
+
+        if last_error:
+            raise last_error
+        raise ValueError("Could not generate a non-duplicate question after 3 attempts.")
+
+    def _is_too_similar(self, gen_question: str, exclude_list: List[str], threshold: float = 0.60) -> bool:
+        """
+        Determines whether a generated question is an exact or near-duplicate of any excluded questions.
+        """
+        if not gen_question or not exclude_list:
+            return False
+
+        norm_gen = re.sub(r'[^\w\s]', ' ', gen_question.lower()).strip()
+        gen_tokens = set([w for w in norm_gen.split() if len(w) > 2])
+        if not gen_tokens:
+            return False
+
+        for excl in exclude_list:
+            norm_excl = re.sub(r'[^\w\s]', ' ', excl.lower()).strip()
+            if norm_gen == norm_excl:
+                return True
+
+            excl_tokens = set([w for w in norm_excl.split() if len(w) > 2])
+            if not excl_tokens:
+                continue
+
+            intersection = len(gen_tokens & excl_tokens)
+            union = len(gen_tokens | excl_tokens)
+            similarity = intersection / union if union > 0 else 0
+            if similarity >= threshold:
+                return True
+
+        return False
 
     def _normalize_mcq_item(self, item: Dict[str, Any], retrieved_chunks: List[Dict[str, Any]]) -> Dict[str, Any]:
         """

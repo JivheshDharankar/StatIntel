@@ -10,6 +10,7 @@ import { MASTER_COMPETENCIES, DEMO_OFFICIAL_PROFILE } from '../data/seedData';
 import { ProfileService } from './profile.service';
 import { CompetencyScoringService } from './competency.service';
 import { RecommendationEngineService } from './recommendation.service';
+import { RevisionService } from './revision.service';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:8000';
 
@@ -234,8 +235,407 @@ export class QuizService {
   }
 
   /**
-   * Retrieves a quiz by ID
+   * Generates a novel retry question targeting a specific concept while explicitly
+   * excluding previous/original questions with multi-attempt duplicate validation.
    */
+  static async generateRetryQuestion(params: {
+    topic: string;
+    concept?: string;
+    excludeQuestions?: string[];
+    difficulty?: string;
+  }): Promise<QuizQuestionItem> {
+    const topic = params.topic || 'Sampling';
+    const concept = params.concept || topic;
+    const excludeList = (params.excludeQuestions || []).filter(q => q && q.trim().length > 0);
+    const diff = params.difficulty || 'medium';
+
+    let candidateQuestion: any = null;
+
+    // 1. Attempt AI Service generation with novelty enforcement and up to 3 attempts
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await axios.post(`${AI_SERVICE_URL}/quiz/generate`, {
+          topic,
+          concept_focus: concept,
+          exclude_questions: excludeList,
+          is_retry: true,
+          question_count: 1,
+          difficulty: diff
+        }, { timeout: 35000 });
+
+        if (response.data && response.data.questions && response.data.questions.length > 0) {
+          const q = response.data.questions[0];
+          if (!this.isTooSimilar(q.question, excludeList)) {
+            candidateQuestion = q;
+            break;
+          }
+        }
+      } catch {
+        // Continue to next attempt or fallback
+      }
+    }
+
+    // 2. Fallback to scenario-based non-duplicate questions if AI is unavailable or duplicates were rejected
+    if (!candidateQuestion) {
+      candidateQuestion = this.getFallbackRetryQuestion(concept, topic, excludeList);
+    }
+
+    const quizId = `retry_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const questionItem: QuizQuestionItem = {
+      id: `q_${quizId}_1`,
+      quizId,
+      questionNumber: 1,
+      question: candidateQuestion.question,
+      options: {
+        A: candidateQuestion.options.A || 'Option A',
+        B: candidateQuestion.options.B || 'Option B',
+        C: candidateQuestion.options.C || 'Option C',
+        D: candidateQuestion.options.D || 'Option D'
+      },
+      correctAnswer: (candidateQuestion.correct_answer || candidateQuestion.correctAnswer || 'A') as 'A' | 'B' | 'C' | 'D',
+      explanation: candidateQuestion.explanation || 'Based on official MoSPI survey methodology standard.',
+      sourceDocument: candidateQuestion.source_document || candidateQuestion.sourceDocument || 'Sampling Design.pdf',
+      sourcePage: Number(candidateQuestion.source_page || candidateQuestion.sourcePage) || 1,
+      sourceChunkId: candidateQuestion.source_chunk_id || candidateQuestion.sourceChunkId || 'chunk_retry'
+    };
+
+    return questionItem;
+  }
+
+  /**
+   * Deterministic duplicate detector: verifies exact and Jaccard word-overlap similarity.
+   */
+  private static isTooSimilar(genQuestion: string, excludeList: string[], threshold: number = 0.55): boolean {
+    if (!genQuestion || !excludeList || excludeList.length === 0) return false;
+
+    const normGen = genQuestion.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
+    const genWords = new Set(normGen.split(/\s+/).filter(w => w.length > 2));
+    if (genWords.size === 0) return false;
+
+    for (const excl of excludeList) {
+      const normExcl = excl.toLowerCase().replace(/[^\w\s]/g, ' ').trim();
+      if (normGen === normExcl) return true;
+
+      const exclWords = new Set(normExcl.split(/\s+/).filter(w => w.length > 2));
+      if (exclWords.size === 0) continue;
+
+      let intersection = 0;
+      for (const w of genWords) {
+        if (exclWords.has(w)) intersection++;
+      }
+      const union = new Set([...genWords, ...exclWords]).size;
+      const similarity = union > 0 ? intersection / union : 0;
+      if (similarity >= threshold) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Generates a grounded, scenario-based retry question with distinct wording from original assessment.
+   */
+  private static getFallbackRetryQuestion(concept: string, topic: string, excludeList: string[]): any {
+    const conceptLower = `${concept} ${topic}`.toLowerCase();
+
+    const bank = [
+      // Sub-Stratum Allocation Variants
+      {
+        tag: 'sub-stratum',
+        question: "A state NSS field director notices that child labour incidence varies drastically across rural districts. Under official sample design guidelines, what threshold determines whether a village is assigned to Sub-stratum 1 versus Sub-stratum 2?",
+        options: {
+          A: "Village child worker proportion exceeding double the State/UT average proportion (p > 2P)",
+          B: "Total district agricultural landholding exceeding 5,000 hectares",
+          C: "Literacy rate falling below 40% in Census 2001",
+          D: "Village distance exceeding 50 km from the nearest district headquarters"
+        },
+        correct_answer: "A",
+        explanation: "MoSPI Sample Design Section 3.4 specifies that Sub-stratum 1 is demarcated by villages with proportion of child workers p > 2P, where P is the State/UT average.",
+        source_document: "Sampling Design.pdf",
+        source_page: 4,
+        source_chunk_id: "chunk_00503"
+      },
+      {
+        tag: 'sub-stratum',
+        question: "In designing the rural sample for the NSS 68th Round Consumer Expenditure Survey, a state statistical officer needs to isolate high-density agricultural wage clusters into Sub-stratum 1. According to MoSPI stratification protocols, how is the cut-off criterion computed?",
+        options: {
+          A: "Equal probability division irrespective of economic indicators",
+          B: "Double the state average benchmark (p > 2P) based on Census population baseline",
+          C: "Geographic distance from the state capital exceeding 100 kilometres",
+          D: "Total village electrification rate below 50%"
+        },
+        correct_answer: "B",
+        explanation: "Official MoSPI stratification protocols mandate establishing Sub-stratum 1 for demographic focus areas using the threshold p > 2P relative to the state benchmark.",
+        source_document: "Sampling Design.pdf",
+        source_page: 4,
+        source_chunk_id: "chunk_00503"
+      },
+      {
+        tag: 'sub-stratum',
+        question: "During sample stratification across North-Eastern states, district officials must ensure rural artisan communities are not omitted from primary stage selection. What stratification rule applies when sub-strata boundaries are established within rural sectors?",
+        options: {
+          A: "Divide rural strata into 2 sub-strata where Sub-stratum 1 isolates high-proportion target clusters (p > 2P)",
+          B: "Eliminate all habitations with population under 500 from the sampling frame",
+          C: "Group all administrative headquarters into a single unstratified stratum",
+          D: "Assign equal sample allocation to all villages without sub-stratification"
+        },
+        correct_answer: "A",
+        explanation: "Rural sector stratification divides each stratum into 2 sub-strata, with sub-stratum 1 capturing specialized population densities with p > 2P.",
+        source_document: "Sampling Design.pdf",
+        source_page: 4,
+        source_chunk_id: "chunk_00503"
+      },
+
+      // PPSWR Selection Variants
+      {
+        tag: 'ppswr',
+        question: "During rural sample allocation, an investigator inquires why larger habitations have a higher chance of selection. Which sampling design property explains this mechanism?",
+        options: {
+          A: "Probability Proportional to Size With Replacement (PPSWR) using Census population as size measure",
+          B: "Simple Random Sampling with uniform probabilities regardless of village size",
+          C: "Cluster sampling restricted exclusively to electrified villages",
+          D: "Systematic sampling ordered strictly by geographical longitude"
+        },
+        correct_answer: "A",
+        explanation: "In official MoSPI rural sampling, FSUs are selected with probability proportional to size (PPSWR), where size equals Census 2001 population.",
+        source_document: "Sampling Design.pdf",
+        source_page: 4,
+        source_chunk_id: "chunk_00503"
+      },
+      {
+        tag: 'ppswr',
+        question: "When selecting 12 sample villages (FSUs) from a rural stratum in Uttar Pradesh, the sampling team utilizes the Cumulative Total Method. Which probability model and size parameter are mandated by MoSPI standards?",
+        options: {
+          A: "Equal probability SRSWOR using total arable land area in square kilometers",
+          B: "Stratified systematic selection using household telephone registrations",
+          C: "Probability Proportional to Size With Replacement (PPSWR) using Census village population as size metric",
+          D: "Convenience quota sampling centered on district headquarters"
+        },
+        correct_answer: "C",
+        explanation: "Section 3.9 specifies that rural FSUs are drawn via PPSWR with size defined by the Census population.",
+        source_document: "Sampling Design.pdf",
+        source_page: 4,
+        source_chunk_id: "chunk_00503"
+      },
+      {
+        tag: 'ppswr',
+        question: "A newly inducted statistical officer questions why simple random sampling without replacement (SRSWOR) is not employed for village selection in national socio-economic surveys. What primary methodological advantage does PPSWR selection offer in this context?",
+        options: {
+          A: "It guarantees zero non-sampling errors during household listing",
+          B: "It yields self-weighting sample designs and reduces variance for population aggregate estimators",
+          C: "It eliminates the need for secondary stage household sampling",
+          D: "It allows field enumerators to survey only easily accessible habitations"
+        },
+        correct_answer: "B",
+        explanation: "PPSWR sampling in multi-stage surveys ensures that larger units have proportionally higher representation, creating self-weighting sample designs and minimizing variance.",
+        source_document: "Sampling Design.pdf",
+        source_page: 5,
+        source_chunk_id: "chunk_00504"
+      },
+
+      // Hamlet-Group Formation & Multiplier Adjustment (D*) Variants
+      {
+        tag: 'hamlet',
+        question: "In an extensive FSU containing 4 distinct hamlet-groups (D = 4), what value must D* take in the official multiplier formula when calculating aggregate population totals?",
+        options: {
+          A: "3 (since D* = D - 1 for FSUs with D > 1)",
+          B: "4 (equal to total hamlet groups D)",
+          C: "0 (regardless of the number of hamlets)",
+          D: "2 (half of total hamlet groups)"
+        },
+        correct_answer: "A",
+        explanation: "Section 7.1 defines D* as 0 when D = 1, and (D - 1) when D > 1. For D = 4, D* = 3.",
+        source_document: "Sampling Design.pdf",
+        source_page: 7,
+        source_chunk_id: "chunk_00507"
+      },
+      {
+        tag: 'hamlet',
+        question: "A field survey team encounters a large village with 2,400 households and subdivides it into 6 equal hamlet-groups (D = 6). In the MoSPI estimation notation for multiplier calculations, what numerical value is assigned to D*?",
+        options: {
+          A: "6 (equal to total hamlets)",
+          B: "5 (because D* = D - 1 when D > 1)",
+          C: "1 (standard constant default)",
+          D: "0 (because sub-division cancels the weight)"
+        },
+        correct_answer: "B",
+        explanation: "Under official MoSPI estimation rules, when D = 6 (> 1), the multiplier correction factor D* = 6 - 1 = 5.",
+        source_document: "Sampling Design.pdf",
+        source_page: 7,
+        source_chunk_id: "chunk_00507"
+      },
+      {
+        tag: 'hamlet',
+        question: "In a small tribal village where no hamlet-groups are created (D = 1), what value does the multiplier factor D* assume in the official NSS estimation formulas?",
+        options: {
+          A: "D* = 0 (because no hamlet subdivision was required)",
+          B: "D* = 1 (equal to D)",
+          C: "D* = -1 (decrement factor)",
+          D: "D* = 0.5 (half-unit weighting)"
+        },
+        correct_answer: "A",
+        explanation: "Section 7.1 explicitly states D* = 0 when D = 1, ensuring the primary listing multiplier remains uninflated.",
+        source_document: "Sampling Design.pdf",
+        source_page: 7,
+        source_chunk_id: "chunk_00507"
+      },
+
+      // Non-Response & Casualty Variants
+      {
+        tag: 'non-response',
+        question: "If 2 out of 10 sampled households in a selected village refuse to participate during survey operations, how does the estimation formula account for this non-response?",
+        options: {
+          A: "The sampling weight is adjusted upward by the ratio of total allocated units to successfully completed units",
+          B: "The village data is discarded entirely from state aggregates",
+          C: "Unsurveyed households are replaced by non-random neighbour substitutes",
+          D: "The missing values are imputed as zero with zero sampling weight"
+        },
+        correct_answer: "A",
+        explanation: "Official MoSPI estimation protocols dictate non-response re-weighting factors equal to (Allocated Sample / Surveyed Sample).",
+        source_document: "Sampling Design.pdf",
+        source_page: 9,
+        source_chunk_id: "chunk_00509"
+      },
+      {
+        tag: 'non-response',
+        question: "During field operations for PLFS in an urban block, 3 casualty households are recorded due to locked residences. According to MoSPI guidelines, how are the estimation weights adjusted to prevent downward estimation bias?",
+        options: {
+          A: "Exclude the entire urban block from the sampling frame",
+          B: "Multiply base respondent weights by the casualty factor (n_allocated / n_surveyed)",
+          C: "Arbitrarily duplicate responses from the first 3 surveyed households",
+          D: "Reduce aggregate state population totals by the uncollected count"
+        },
+        correct_answer: "B",
+        explanation: "Casualty households are compensated by inflating respondent sampling weights by (n_allocated / n_surveyed) within the same stratum.",
+        source_document: "Sampling Design.pdf",
+        source_page: 9,
+        source_chunk_id: "chunk_00509"
+      },
+      {
+        tag: 'non-response',
+        question: "An ISS officer analyzing non-response in household surveys notes that simply dropping casualty households underestimates total aggregate expenditure. What formula calibration resolves this discrepancy?",
+        options: {
+          A: "Allocating zero weight to all households in the district",
+          B: "Multiplying design weights by the ratio of allocated sample units to completed interviews",
+          C: "Substituting commercial retail estimates for missing household data",
+          D: "Capping all household expenditure values at the 50th percentile"
+        },
+        correct_answer: "B",
+        explanation: "Design weight calibration by the ratio (Allocated Units / Completed Interviews) preserves unbiased aggregate totals.",
+        source_document: "Sampling Design.pdf",
+        source_page: 9,
+        source_chunk_id: "chunk_00509"
+      },
+
+      // Non-Sampling Error Mitigation & CAPI Validation Variants
+      {
+        tag: 'non-sampling',
+        question: "A quality assurance audit reports that field investigators occasionally misclassify informal enterprise revenues. What operational measure most effectively curbs this non-sampling error?",
+        options: {
+          A: "Implementing real-time CAPI validation rules and structured probing protocols",
+          B: "Increasing the sample size of FSUs across urban blocks",
+          C: "Applying post-stratification weights during macro estimation",
+          D: "Switching from multistage sampling to unstratified simple random sampling"
+        },
+        correct_answer: "A",
+        explanation: "Non-sampling errors stem from measurement and reporting inaccuracies; CAPI automated range validations directly prevent field data entry errors.",
+        source_document: "Survey Methodology.pdf",
+        source_page: 15,
+        source_chunk_id: "chunk_00215"
+      },
+      {
+        tag: 'non-sampling',
+        question: "During periodic labour force data entry, an enumerator enters a weekly working hours total of 168 hours for a casual labourer. Which data quality mechanism in official MoSPI surveys intercepts this error at source?",
+        options: {
+          A: "Computer-Assisted Personal Interviewing (CAPI) automated hard-range validation rules and logical consistency constraints",
+          B: "Post-survey variance estimation formulas",
+          C: "Stratum weight adjustment factors",
+          D: "Annual benchmark revisions by the National Statistical Commission"
+        },
+        correct_answer: "A",
+        explanation: "CAPI digital entry tools embed hard and soft validation constraints that instantly block illogical or out-of-range responses in real time.",
+        source_document: "Survey Methodology.pdf",
+        source_page: 15,
+        source_chunk_id: "chunk_00215"
+      },
+      {
+        tag: 'non-sampling',
+        question: "Comparing sampling errors versus non-sampling errors, an MoSPI survey director wants to minimize respondent recall decay and enumerator recording bias. Which strategy directly tackles this non-sampling distortion?",
+        options: {
+          A: "Deploying structured 7-day recall reference periods and standardized CAPI digital questionnaires with validation rules",
+          B: "Doubling the number of primary stage sampling units without changing survey instruments",
+          C: "Applying Finite Population Correction to final variance estimates",
+          D: "Restricting data collection to telephone interviews only"
+        },
+        correct_answer: "A",
+        explanation: "Non-sampling errors are mitigated through optimized recall periods and rigorous CAPI questionnaire validation.",
+        source_document: "Survey Methodology.pdf",
+        source_page: 15,
+        source_chunk_id: "chunk_00215"
+      },
+
+      // Design Effect (Deff) Variants
+      {
+        tag: 'design effect',
+        question: "When evaluating survey efficiency, a statistician observes that clustering increased estimation variance by 40% compared to simple random sampling. What metric represents this ratio?",
+        options: {
+          A: "Design Effect (Deff = 1.40)",
+          B: "Relative Standard Error (RSE = 40%)",
+          C: "Finite Population Correction (FPC = 0.60)",
+          D: "Coefficient of Variation (CV = 1.40)"
+        },
+        correct_answer: "A",
+        explanation: "The Design Effect (Deff = Var_complex / Var_srs) measures the variance inflation factor due to clustering and stratification relative to SRS.",
+        source_document: "Sampling Design.pdf",
+        source_page: 11,
+        source_chunk_id: "chunk_00511"
+      },
+      {
+        tag: 'design effect',
+        question: "In assessing the multi-stage cluster design of the Household Consumption Survey, the calculated Design Effect (Deff) for rural per-capita expenditure is 1.75. How should this finding be interpreted?",
+        options: {
+          A: "The survey estimator has 75% higher variance than an equivalent simple random sample due to intra-cluster correlation",
+          B: "The sample size should be reduced by 75% to achieve efficiency",
+          C: "75% of households refused to answer the questionnaire",
+          D: "The estimate has a 75% margin of non-sampling error"
+        },
+        correct_answer: "A",
+        explanation: "Deff = 1.75 indicates that cluster homogeneity increases the variance of the estimator by 75% compared to SRS of the same size.",
+        source_document: "Sampling Design.pdf",
+        source_page: 11,
+        source_chunk_id: "chunk_00511"
+      },
+      {
+        tag: 'design effect',
+        question: "A survey methodologist wants to calculate the effective sample size for a complex survey with sample size n = 1,200 and estimated Deff = 1.5. What is the equivalent simple random sample size (n_eff)?",
+        options: {
+          A: "800 (calculated as n / Deff = 1,200 / 1.5)",
+          B: "1,800 (calculated as n * Deff)",
+          C: "1,200 (equal to nominal sample size)",
+          D: "600 (half of sample size)"
+        },
+        correct_answer: "A",
+        explanation: "Effective sample size n_eff is calculated as Nominal Sample Size divided by Deff (1,200 / 1.5 = 800).",
+        source_document: "Sampling Design.pdf",
+        source_page: 11,
+        source_chunk_id: "chunk_00511"
+      }
+    ];
+
+    // Find first question in bank matching concept that isn't in excludeList
+    for (const item of bank) {
+      if (conceptLower.includes(item.tag) && !this.isTooSimilar(item.question, excludeList)) {
+        return item;
+      }
+    }
+
+    // Secondary pass: any non-duplicate in bank
+    for (const item of bank) {
+      if (!this.isTooSimilar(item.question, excludeList)) {
+        return item;
+      }
+    }
+
+    return bank[0];
+  }
   static getQuizById(quizId: string): QuizItem | null {
     return storedQuizzes.get(quizId) || null;
   }
@@ -355,6 +755,10 @@ export class QuizService {
       'Statistical Officer'
     );
 
+    // Generate Quick Revision Notes for missed questions
+    const incorrectQuestions = questionResults.filter(q => !q.isCorrect);
+    const revisionNotes = await RevisionService.generateRevisionNotes(incorrectQuestions, quiz.topic);
+
     const attemptResult: QuizSubmissionResult = {
       attemptId: `att_${Date.now()}`,
       quizId,
@@ -377,7 +781,8 @@ export class QuizService {
       evidenceId,
       submittedAt: new Date().toISOString(),
       questionResults,
-      nextRecommendations: nextRecommendations.slice(0, 3)
+      nextRecommendations: nextRecommendations.slice(0, 3),
+      revisionNotes
     };
 
     return attemptResult;

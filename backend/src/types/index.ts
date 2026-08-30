@@ -157,6 +157,21 @@ export interface QuestionSubmissionResult {
   sourceChunkId: string;
 }
 
+export interface QuickRevisionNote {
+  id: string;
+  concept: string;
+  quickNote: string;
+  remember: string;
+  source: {
+    documentTitle: string;
+    page: number | string;
+    chunkId: string;
+  };
+  relatedQuestionIds?: string[];
+  competencyCode?: string;
+  competencyName?: string;
+}
+
 export interface QuizSubmissionResult {
   attemptId: string;
   quizId: string;
@@ -180,4 +195,5 @@ export interface QuizSubmissionResult {
   submittedAt: string;
   questionResults: QuestionSubmissionResult[];
   nextRecommendations: RecommendationItem[];
+  revisionNotes?: QuickRevisionNote[];
 }
